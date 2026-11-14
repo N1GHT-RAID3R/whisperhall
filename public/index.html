@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#060911">
+  <meta name="description" content="WhisperHall is a campus study lounge with expiring messages, focus tools and encrypted private rooms.">
+  <title>WhisperHall — Campus Study Lounge</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :root{color-scheme:dark}
+    body{background:radial-gradient(circle at 15% 10%,rgba(16,185,129,.13),transparent 35%),radial-gradient(circle at 85% 15%,rgba(56,189,248,.1),transparent 38%),#060911;color:#f1f5f9;font-family:Inter,ui-sans-serif,system-ui,sans-serif}
+    .glass{background:rgba(13,19,34,.84);backdrop-filter:blur(16px);border:1px solid rgba(148,163,184,.14)}
+    .card{background:rgba(20,29,50,.76);backdrop-filter:blur(12px);border:1px solid rgba(148,163,184,.14)}
+    .redact-active #messageFeed{filter:blur(12px);opacity:.25}
+    button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid #34d399;outline-offset:2px}
+    @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;animation:none!important;transition:none!important}}
+  </style>
+</head>
+<body class="min-h-screen flex flex-col">
+<header class="glass sticky top-0 z-20 px-4 py-3">
+ <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
+  <div><div class="font-bold text-lg text-white">WhisperHall <span id="connectionBadge" class="ml-2 text-[10px] font-mono rounded-full px-2 py-1 bg-slate-800 text-slate-300">LOCAL MODE</span></div><div id="identity" class="text-xs text-emerald-300">Not signed in</div></div>
+  <nav class="flex gap-2"><button id="publicTab" class="rounded-lg px-3 py-2 text-xs bg-emerald-500 text-slate-950 font-semibold">Public Lounge</button><button id="secretTab" class="rounded-lg px-3 py-2 text-xs bg-slate-800">Private Vault</button></nav>
+  <div class="flex flex-wrap gap-2"><button id="privacyBtn" class="rounded-lg px-3 py-2 text-xs bg-slate-800">Privacy limits</button><button id="profileBtn" class="rounded-lg px-3 py-2 text-xs bg-slate-800">Profile</button></div>
+ </div>
+</header>
+
+<main class="max-w-7xl w-full mx-auto flex-1 p-4 grid grid-cols-1 lg:grid-cols-12 gap-4">
+ <aside class="lg:col-span-3 space-y-4">
+  <section class="card rounded-2xl p-4 space-y-3">
+   <h2 class="text-xs uppercase tracking-wider text-slate-400 font-semibold">Room</h2>
+   <div class="rounded-xl bg-emerald-500/10 border border-emerald-500/30 p-3 text-sm">#campus-commons <span class="float-right text-[10px] text-emerald-300">PUBLIC</span></div>
+   <label class="block text-xs text-slate-300" for="roomSlug">Private room name</label><input id="roomSlug" maxlength="48" value="study-vault" class="w-full rounded-lg bg-slate-950 border border-slate-700 p-2 text-sm">
+   <label class="block text-xs text-slate-300" for="roomPass">Private room passphrase</label><input id="roomPass" type="password" autocomplete="off" class="w-full rounded-lg bg-slate-950 border border-slate-700 p-2 text-sm" placeholder="Use a long, unique passphrase">
+   <button id="unlockVault" class="w-full rounded-lg bg-sky-500 hover:bg-sky-400 text-slate-950 font-semibold p-2 text-xs">Unlock private room</button>
+   <p class="text-[11px] leading-relaxed text-slate-400">Private messages are encrypted in your browser before relay. Use a long passphrase and share it only with intended participants.</p>
+  </section>
+  <section class="card rounded-2xl p-4 space-y-2">
+   <div class="flex justify-between"><h2 class="text-xs uppercase tracking-wider text-slate-400 font-semibold">Campus peers</h2><span id="peerCount" class="text-xs text-emerald-300">0 online</span></div>
+   <ul id="peerList" class="space-y-2 text-xs text-slate-300"><li>Connect to a relay to see peers.</li></ul>
+  </section>
+ </aside>
+
+ <section class="lg:col-span-6 card rounded-2xl min-h-[580px] max-h-[78vh] flex flex-col overflow-hidden">
+  <div class="px-4 py-3 border-b border-slate-800 flex items-center justify-between gap-3">
+   <div><h1 id="roomTitle" class="font-semibold text-sm">#campus-commons</h1><p id="roomDescription" class="text-xs text-slate-400">A shared student lounge. Avoid posting personal or sensitive information.</p></div>
+   <button id="clearView" class="text-xs rounded-lg bg-slate-800 px-3 py-2">Clear view</button>
+  </div>
+  <div id="messageFeed" aria-live="polite" class="flex-1 overflow-y-auto p-4 space-y-3"></div>
+  <div id="replyBar" class="hidden px-4 py-2 border-t border-slate-800 bg-slate-950 text-xs flex justify-between gap-2"><span id="replyText" class="truncate"></span><button id="cancelReply" class="text-rose-300">Cancel</button></div>
+  <form id="composer" class="p-3 border-t border-slate-800 flex gap-2">
+   <input id="messageInput" maxlength="1600" required class="min-w-0 flex-1 rounded-xl bg-slate-950 border border-slate-700 px-3 py-2 text-sm" placeholder="Write a message…" autocomplete="off">
+   <select id="ttl" aria-label="Message expiry" class="rounded-xl bg-slate-950 border border-slate-700 px-2 text-xs"><option value="30">30 sec</option><option value="300" selected>5 min</option><option value="3600">1 hour</option></select>
+   <button id="sendBtn" class="rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-semibold px-4 text-sm">Send</button>
+  </form>
+  <p id="statusLine" role="status" class="px-4 pb-3 text-[11px] text-slate-400">Local preview: messages stay in this browser tab and are not shared.</p>
+ </section>
+
+ <aside class="lg:col-span-3 space-y-4">
+  <section class="card rounded-2xl p-4 space-y-3">
+   <h2 class="text-xs uppercase tracking-wider text-slate-400 font-semibold">Pomodoro timer</h2>
+   <div id="clock" class="text-center text-4xl font-mono font-bold">25:00</div>
+   <div class="flex gap-2"><button id="pomoStart" class="flex-1 rounded-lg bg-emerald-500 text-slate-950 font-semibold p-2 text-xs">Start</button><button id="pomoReset" class="rounded-lg bg-slate-800 p-2 text-xs">Reset</button></div>
+  </section>
+  <section class="card rounded-2xl p-4 space-y-3">
+   <div class="flex justify-between items-center"><h2 class="text-xs uppercase tracking-wider text-slate-400 font-semibold">Study flashcard</h2><button id="nextCard" class="text-xs text-emerald-300">Next</button></div>
+   <p id="question" class="text-sm font-medium"></p><button id="reveal" class="w-full rounded-lg bg-slate-800 p-2 text-xs">Reveal answer</button><p id="answer" class="hidden rounded-lg bg-slate-950 p-3 text-xs text-emerald-200"></p>
+  </section>
+  <section class="card rounded-2xl p-4 space-y-2">
+   <h2 class="text-xs uppercase tracking-wider text-slate-400 font-semibold">Session controls</h2>
+   <button id="panic" class="w-full rounded-lg bg-rose-500/15 border border-rose-500/30 text-rose-200 p-2 text-xs">Hide chat content</button>
+   <button id="purge" class="w-full rounded-lg bg-slate-800 p-2 text-xs">Purge local session</button>
+  </section>
+ </aside>
+</main>
+
+<div id="profileModal" class="fixed inset-0 z-40 bg-slate-950/90 flex items-center justify-center p-4">
+ <form id="profileForm" class="glass rounded-2xl p-6 w-full max-w-md space-y-4">
+  <div><h2 class="text-xl font-bold">Join WhisperHall</h2><p class="text-xs text-slate-400 mt-1">Choose a display name and school. No account verification is provided by this demo.</p></div>
+  <label class="block text-xs text-slate-300">School / institution<input id="school" required maxlength="80" class="mt-1 w-full rounded-lg bg-slate-950 border border-slate-700 p-2 text-sm" placeholder="Your school"></label>
+  <label class="block text-xs text-slate-300">Display handle<input id="handle" required maxlength="24" pattern="[A-Za-z0-9_-]+" class="mt-1 w-full rounded-lg bg-slate-950 border border-slate-700 p-2 text-sm" placeholder="NightOwl"></label>
+  <label class="block text-xs text-slate-300">Relay WebSocket URL (optional)<input id="relayUrl" type="url" class="mt-1 w-full rounded-lg bg-slate-950 border border-slate-700 p-2 text-xs" placeholder="wss://your-domain.example"></label>
+  <p class="text-[11px] text-amber-200">Do not use your real full name or share private contact details. The relay is not an identity-verification service.</p>
+  <button class="w-full rounded-lg bg-emerald-500 text-slate-950 font-semibold p-2.5 text-sm">Enter lounge</button>
+ </form>
+</div>
+
+<div id="privacyModal" class="hidden fixed inset-0 z-50 bg-slate-950/90 flex items-center justify-center p-4">
+ <div class="glass rounded-2xl p-6 max-w-lg w-full space-y-3"><h2 class="font-bold text-lg">Privacy limits</h2><p class="text-sm text-slate-300">A browser app cannot reliably prevent screenshots, screen recording, cameras, developer tools, or copying. The hide-chat control only obscures this page. Do not treat it as leak-proof protection.</p><p class="text-sm text-slate-300">Private-room encryption protects message contents in transit when every participant uses the same passphrase, but the relay still sees metadata such as room identifiers, message sizes, timing, and display names. This prototype has no accounts, moderation, abuse reporting, or audited cryptographic review.</p><button id="closePrivacy" class="rounded-lg bg-emerald-500 text-slate-950 px-4 py-2 text-sm font-semibold">Close</button></div>
+</div>
+
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+const state = {
+ profile:{handle:'',school:''}, mode:'public', roomHash:'', passphrase:'',
+ ws:null, relayUrl:'', messages:{public:[],secret:{}}, replyTo:null, peers:[],
+ hidden:false, pomo:1500, pomoRunning:false, cardIndex:0
+};
+const flashcards=[
+ {q:'What is the purpose of a random salt in password-based key derivation?',a:'It makes derived keys unique and prevents attackers from reusing precomputed password tables.'},
+ {q:'What is the derivative of ln(x² + 1)?',a:'Using the chain rule: 2x / (x² + 1).'},
+ {q:'Why must AES-GCM use a unique nonce with each key?',a:'Nonce reuse with the same key can seriously undermine confidentiality and authentication.'}
+];
+const escapeHtml = s => String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const bytesToHex = b => Array.from(new Uint8Array(b),x=>x.toString(16).padStart(2,'0')).join('');
+const hexToBytes = h => {if(typeof h!=='string'||h.length%2||!/^[0-9a-f]+$/i.test(h))throw Error('Invalid encrypted message format');return new Uint8Array(h.match(/.{2}/g).map(x=>parseInt(x,16)));};
+async function sha256Hex(s){return bytesToHex(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s)));}
+async function deriveKey(pass,salt){
+ const material=await crypto.subtle.importKey('raw',new TextEncoder().encode(pass),'PBKDF2',false,['deriveKey']);
+ return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:310000,hash:'SHA-256'},material,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);
+}
+async function encryptMessage(text,pass){
+ const salt=crypto.getRandomValues(new Uint8Array(16)),iv=crypto.getRandomValues(new Uint8Array(12));
+ const key=await deriveKey(pass,salt);
+ const cipher=await crypto.subtle.encrypt({name:'AES-GCM',iv},key,new TextEncoder().encode(text));
+ return {salt:bytesToHex(salt),iv:bytesToHex(iv),ciphertext:bytesToHex(cipher)};
+}
+async function decryptMessage(env,pass){
+ const salt=hexToBytes(env.salt),iv=hexToBytes(env.iv),cipher=hexToBytes(env.ciphertext);
+ if(salt.length!==16||iv.length!==12)throw Error('Invalid encrypted message parameters');
+ const key=await deriveKey(pass,salt);
+ return new TextDecoder().decode(await crypto.subtle.decrypt({name:'AES-GCM',iv},key,cipher));
+}
+function currentList(){return state.mode==='public'?state.messages.public:(state.messages.secret[state.roomHash]||[]);}
+function setStatus(s){$('statusLine').textContent=s;}
+function updateRoom(){
+ $('roomTitle').textContent=state.mode==='public'?'#campus-commons':`#${$('roomSlug').value.trim()||'private-room'}`;
+ $('roomDescription').textContent=state.mode==='public'?'A shared student lounge. Avoid posting personal or sensitive information.':'Encrypted private room. Everyone needs the same room name and passphrase.';
+ $('publicTab').className=state.mode==='public'?'rounded-lg px-3 py-2 text-xs bg-emerald-500 text-slate-950 font-semibold':'rounded-lg px-3 py-2 text-xs bg-slate-800';
+ $('secretTab').className=state.mode==='secret'?'rounded-lg px-3 py-2 text-xs bg-sky-500 text-slate-950 font-semibold':'rounded-lg px-3 py-2 text-xs bg-slate-800';
+ renderMessages();
+}
+function renderMessages(){
+ const feed=$('messageFeed'),list=currentList();feed.replaceChildren();
+ const now=Date.now();
+ if(!list.length){const p=document.createElement('p');p.className='text-center text-xs text-slate-500 py-12';p.textContent='No messages here yet.';feed.append(p);return;}
+ for(const m of list){
+  const article=document.createElement('article');article.className='rounded-xl bg-slate-900/90 border border-slate-800 p-3 space-y-2';
+  const top=document.createElement('div');top.className='flex justify-between gap-2 text-xs';
+  const who=document.createElement('span');who.className='font-mono text-emerald-300';who.textContent=`@${m.handle} @ ${m.school}`;
+  const expiry=document.createElement('span');expiry.className='text-amber-300';expiry.textContent=`${Math.max(0,Math.ceil((m.expiresAt-now)/1000))}s`;
+  top.append(who,expiry);
+  const body=document.createElement('p');body.className='text-sm whitespace-pre-wrap break-words text-slate-100';body.textContent=m.text;
+  article.append(top);
+  if(m.replyTo){const reply=document.createElement('p');reply.className='text-xs text-slate-400 border-l-2 border-emerald-500 pl-2';reply.textContent=`Replying to @${m.replyTo.handle}: ${m.replyTo.preview}`;article.append(reply);}
+  article.append(body);
+  const actions=document.createElement('div');actions.className='flex justify-between items-center';
+  const reactions=document.createElement('div');reactions.className='flex gap-1';
+  for(const emoji of ['👍','💡','🔥']){const b=document.createElement('button');b.type='button';b.className='rounded bg-slate-950 px-2 py-1 text-xs';b.textContent=`${emoji} ${m.reactions?.[emoji]||0}`;b.addEventListener('click',()=>{m.reactions=m.reactions||{};m.reactions[emoji]=(m.reactions[emoji]||0)+1;renderMessages();});reactions.append(b);}
+  const replyBtn=document.createElement('button');replyBtn.type='button';replyBtn.className='text-xs text-slate-400';replyBtn.textContent='Reply';replyBtn.addEventListener('click',()=>{state.replyTo={id:m.id,handle:m.handle,preview:m.text.slice(0,80)};$('replyText').textContent=`Replying to @${m.handle}: ${state.replyTo.preview}`;$('replyBar').classList.remove('hidden');});
+  actions.append(reactions,replyBtn);article.append(actions);feed.append(article);
+ }
+ feed.scrollTop=feed.scrollHeight;
+}
+function sendPacket(packet){
+ if(state.ws?.readyState===WebSocket.OPEN){state.ws.send(JSON.stringify(packet));return true;}
+ return false;
+}
+function connectRelay(url){
+ if(state.ws){state.ws.close();state.ws=null;}
+ state.relayUrl=url;
+ if(!url){$('connectionBadge').textContent='LOCAL MODE';setStatus('Local preview: messages are stored only in this tab.');return;}
+ let parsed;try{parsed=new URL(url);if(parsed.protocol!=='wss:'&&parsed.protocol!=='ws:')throw Error();}catch{$('connectionBadge').textContent='BAD RELAY URL';setStatus('Enter a valid ws:// or wss:// relay URL.');return;}
+ if(location.protocol==='https:'&&parsed.protocol==='ws:'){setStatus('Secure pages require a wss:// relay URL.');return;}
+ try{
+  const ws=new WebSocket(url);state.ws=ws;
+  ws.addEventListener('open',()=>{if(state.ws!==ws)return;$('connectionBadge').textContent='RELAY CONNECTED';sendPacket({type:'auth_profile',handle:state.profile.handle,school:state.profile.school,roomKey:state.mode==='public'?'public:campus-commons':`secret:${state.roomHash}`});setStatus('Connected to relay.');});
+  ws.addEventListener('message',async ev=>{
+   let packet;try{packet=JSON.parse(ev.data);}catch{return;}
+   if(packet.type==='public_history'&&state.mode==='public'){state.messages.public=packet.messages||[];renderMessages();}
+   if(packet.type==='public_message'&&packet.message){const m=packet.message;const item={...m,handle:m.senderHandle,school:m.senderSchool,reactions:{}};if(!state.messages.public.some(x=>x.id===item.id))state.messages.public.push(item);renderMessages();}
+   if(packet.type==='secret_history'&&packet.roomHash===state.roomHash&&state.passphrase){
+    for(const env of packet.envelopes||[]){try{const text=await decryptMessage(env,state.passphrase);addSecretMessage(env,text);}catch{}}
+    renderMessages();
+   }
+   if(packet.type==='secret_envelope'&&packet.roomHash===state.roomHash&&state.passphrase){try{const text=await decryptMessage(packet.envelope,state.passphrase);addSecretMessage(packet.envelope,text);renderMessages();}catch{setStatus('A private message could not be decrypted. Check that everyone uses the same passphrase.');}}
+   if(packet.type==='presence_update'){state.peers=packet.peers||[];$('peerCount').textContent=`${packet.count||0} online`;$('peerList').replaceChildren();for(const p of state.peers){const li=document.createElement('li');li.textContent=`@${p.handle} · ${p.school}`;$('peerList').append(li);}}
+   if(packet.type==='error')setStatus(packet.message||'Relay error.');
+  });
+  ws.addEventListener('close',()=>{if(state.ws===ws){$('connectionBadge').textContent='DISCONNECTED';setStatus('Relay disconnected. Local preview remains available.');}});
+  ws.addEventListener('error',()=>setStatus('Could not connect to relay. Check the URL and server status.'));
+ }catch{setStatus('WebSocket is unavailable in this browser.');}
+}
+function addSecretMessage(env,text){
+ const list=state.messages.secret[state.roomHash]||(state.messages.secret[state.roomHash]=[]);
+ if(list.some(m=>m.id===env.id))return;
+ list.push({id:env.id,handle:env.senderHandle,school:env.senderSchool,text,createdAt:env.createdAt,expiresAt:env.expiresAt,reactions:{}});
+}
+function joinCurrentRoom(){
+ if(state.mode==='public'){sendPacket({type:'join_room',roomKey:'public:campus-commons'});}
+ else if(state.roomHash){sendPacket({type:'join_room',roomKey:`secret:${state.roomHash}`});}
+}
+$('profileForm').addEventListener('submit',e=>{
+ e.preventDefault();state.profile.school=$('school').value.trim();state.profile.handle=$('handle').value.trim().replace(/^@/,'');
+ if(!state.profile.school||!state.profile.handle)return;
+ if(!/^[A-Za-z0-9_-]{1,24}$/.test(state.profile.handle)){setStatus('Handle may contain letters, numbers, underscores and hyphens only.');return;}
+ $('profileModal').classList.add('hidden');$('identity').textContent=`@${state.profile.handle} @ ${state.profile.school}`;
+ connectRelay($('relayUrl').value.trim());
+});
+$('profileBtn').addEventListener('click',()=>{$('school').value=state.profile.school;$('handle').value=state.profile.handle;$('relayUrl').value=state.relayUrl;$('profileModal').classList.remove('hidden');});
+$('publicTab').addEventListener('click',()=>{state.mode='public';joinCurrentRoom();updateRoom();});
+$('secretTab').addEventListener('click',()=>{state.mode='secret';joinCurrentRoom();updateRoom();});
+$('unlockVault').addEventListener('click',async()=>{
+ const slug=$('roomSlug').value.trim().toLowerCase().replace(/[^a-z0-9_-]/g,'').slice(0,48),pass=$('roomPass').value;
+ if(slug.length<3||pass.length<12){setStatus('Use a room name of at least 3 characters and a passphrase of at least 12 characters.');return;}
+ if(!window.crypto?.subtle){setStatus('Web Crypto requires HTTPS or localhost.');return;}
+ state.roomHash=await sha256Hex(`whisperhall-room:${slug}`);state.passphrase=pass;state.mode='secret';state.messages.secret[state.roomHash]=state.messages.secret[state.roomHash]||[];
+ updateRoom();joinCurrentRoom();$('roomPass').value='';setStatus('Private room unlocked. Keep the passphrase private.');
+});
+$('composer').addEventListener('submit',async e=>{
+ e.preventDefault();const text=$('messageInput').value.trim();if(!text)return;
+ if(!state.profile.school){$('profileModal').classList.remove('hidden');return;}
+ const ttlSeconds=Number($('ttl').value)||300,now=Date.now();
+ if(state.mode==='secret'&&(!state.passphrase||!state.roomHash)){setStatus('Unlock the private room before sending.');return;}
+ const btn=$('sendBtn');btn.disabled=true;
+ try{
+  if(state.mode==='public'){
+   const msg={id:crypto.randomUUID(),handle:state.profile.handle,school:state.profile.school,text,replyTo:state.replyTo,createdAt:now,expiresAt:now+ttlSeconds*1000,reactions:{}};
+   const sent=sendPacket({type:'public_message',roomId:'campus-commons',handle:state.profile.handle,school:state.profile.school,text,replyTo:state.replyTo,ttlSeconds});if(!sent)state.messages.public.push(msg);
+  }else{
+   const env=await encryptMessage(text,state.passphrase);
+   const local={...env,id:crypto.randomUUID(),senderHandle:state.profile.handle,senderSchool:state.profile.school,createdAt:now,expiresAt:now+ttlSeconds*1000};
+   const sent=sendPacket({type:'secret_envelope',roomHash:state.roomHash,handle:state.profile.handle,school:state.profile.school,...env,ttlSeconds});
+   if(!sent)addSecretMessage(local,text);
+  }
+  $('messageInput').value='';state.replyTo=null;$('replyBar').classList.add('hidden');renderMessages();
+ }catch(err){setStatus(`Could not send message: ${err.message}`);}
+ finally{btn.disabled=false;}
+});
+$('cancelReply').addEventListener('click',()=>{state.replyTo=null;$('replyBar').classList.add('hidden');});
+$('clearView').addEventListener('click',()=>{if(state.mode==='public')state.messages.public=[];else state.messages.secret[state.roomHash]=[];renderMessages();setStatus('Cleared this browser view. Server history is not deleted.');});
+$('privacyBtn').addEventListener('click',()=>$('privacyModal').classList.remove('hidden'));
+$('closePrivacy').addEventListener('click',()=>$('privacyModal').classList.add('hidden'));
+$('panic').addEventListener('click',()=>{document.body.classList.toggle('redact-active');state.hidden=!state.hidden;$('panic').textContent=state.hidden?'Show chat content':'Hide chat content';});
+$('purge').addEventListener('click',()=>{state.passphrase='';state.roomHash='';state.messages={public:[],secret:{}};$('roomPass').value='';state.replyTo=null;renderMessages();setStatus('Local messages and private-room passphrase cleared from this page session.');});
+function renderClock(){ $('clock').textContent=`${String(Math.floor(state.pomo/60)).padStart(2,'0')}:${String(state.pomo%60).padStart(2,'0')}`;}
+$('pomoStart').addEventListener('click',()=>{state.pomoRunning=!state.pomoRunning;$('pomoStart').textContent=state.pomoRunning?'Pause':'Start';});
+$('pomoReset').addEventListener('click',()=>{state.pomoRunning=false;state.pomo=1500;$('pomoStart').textContent='Start';renderClock();});
+function renderCard(){const c=flashcards[state.cardIndex%flashcards.length];$('question').textContent=c.q;$('answer').textContent=c.a;$('answer').classList.add('hidden');}
+$('nextCard').addEventListener('click',()=>{state.cardIndex++;renderCard();});
+$('reveal').addEventListener('click',()=>$('answer').classList.toggle('hidden'));
+setInterval(()=>{
+ if(state.pomoRunning){if(state.pomo>0)state.pomo--;if(state.pomo===0){state.pomoRunning=false;$('pomoStart').textContent='Start';setStatus('Focus session complete. Take a short break.');}renderClock();}
+ const now=Date.now();let changed=false;
+ for(const key of ['public',...Object.keys(state.messages.secret)]){const list=key==='public'?state.messages.public:state.messages.secret[key];const kept=list.filter(m=>m.expiresAt>now);if(kept.length!==list.length){changed=true;if(key==='public')state.messages.public=kept;else state.messages.secret[key]=kept;}}
+ if(changed)renderMessages();else if(currentList().length)renderMessages();
+},1000);
+renderClock();renderCard();renderMessages();
+</script>
+</body>
+</html>
